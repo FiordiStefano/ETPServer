@@ -5,6 +5,7 @@
  */
 package ETPServer;
 
+import com.google.protobuf.ByteString;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -14,9 +15,12 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 import javax.json.Json;
 import javax.json.JsonObject;
+import packet.protoPacket.resp;
+import packet.protoPacket.dataPacket;
 
 /**
  * Classe che gestisce il file da ricevere
+ *
  * @author Stefano Fiordi
  */
 public class FileHandlerServer {
@@ -32,7 +36,7 @@ public class FileHandlerServer {
     /**
      * numero di pacchetti totale
      */
-    protected int nPackets; 
+    protected int nPackets;
     /**
      * indice del pacchetto da cui iniziare il trasferimento
      */
@@ -40,18 +44,20 @@ public class FileHandlerServer {
     /**
      * digest MD5 del file da ricevere
      */
-    protected String fileDigest; 
+    protected String fileDigest;
     /**
-     * contatore per i pacchetti errati 
+     * contatore per i pacchetti errati
      */
-    protected int RetryCount = 0; 
+    protected int RetryCount = 0;
 
     /**
-     * Costruttore che calcola il numero di pacchetti in base alla lunghezza del file e stabilisce l'indice iniziale per i pacchetti
+     * Costruttore che calcola il numero di pacchetti in base alla lunghezza del
+     * file e stabilisce l'indice iniziale per i pacchetti
+     *
      * @param FileToRecv il file da ricevere
      * @param fileDigest il digest del file in MD5
      * @param length la lunghezza del file da ricevere
-     * @throws IOException 
+     * @throws IOException
      * @throws NoSuchAlgorithmException
      */
     public FileHandlerServer(File FileToRecv, String fileDigest, int length) throws IOException, NoSuchAlgorithmException {
@@ -68,7 +74,7 @@ public class FileHandlerServer {
             this.FileToRecv.createNewFile();
             this.startIndex = 0;
         } else {
-            if (checksum() || this.FileToRecv.length()>= length) {
+            if (checksum() || this.FileToRecv.length() >= length) {
                 this.startIndex = -1;
             } else {
                 this.startIndex = (int) this.FileToRecv.length() / NumberOfBytes;
@@ -77,11 +83,14 @@ public class FileHandlerServer {
     }
 
     /**
-     * Metodo che aggiunge il pacchetto ricevuto al file in caso il numero sia correttor, altrimenti richiede il pacchetto con il numero corretto, per un massimo di tre volte
+     * Metodo che aggiunge il pacchetto ricevuto al file in caso il numero sia
+     * correttor, altrimenti richiede il pacchetto con il numero corretto, per
+     * un massimo di tre volte
+     *
      * @param JsonPacket Il pacchetto da aggiungere al file
-     * @param packetIndex l'indice corretto 
-     * @return il pacchetto Json di risposta 
-     * @throws IOException 
+     * @param packetIndex l'indice corretto
+     * @return il pacchetto Json di risposta
+     * @throws IOException
      */
     public JsonObject addPacket(JsonObject JsonPacket, int packetIndex) throws IOException {
         JsonObject JsonRespPacket;
@@ -119,7 +128,51 @@ public class FileHandlerServer {
     }
 
     /**
+     * Metodo che aggiunge il pacchetto ricevuto al file in caso il numero sia
+     * correttor, altrimenti richiede il pacchetto con il numero corretto, per
+     * un massimo di tre volte
+     *
+     * @param protoPacket Il pacchetto da aggiungere al file
+     * @param packetIndex l'indice corretto
+     * @return il pacchetto protobuf di risposta
+     * @throws IOException
+     */
+    public resp addProtoPacket(dataPacket protoPacket, int packetIndex) throws IOException {
+        resp ProtoRespPacket;
+
+        if (protoPacket.getNumber() == packetIndex) {
+            ByteString bsPacket = protoPacket.getText();
+            // accodo il pacchetto al file
+            Files.write(FileToRecv.toPath(), bsPacket.toByteArray(), StandardOpenOption.APPEND);
+
+            ProtoRespPacket = resp.newBuilder()
+                    .setType("resp")
+                    .setResp("ok")
+                    .build();
+
+            RetryCount = 0;
+        } else {
+            if (RetryCount < 3) {
+                ProtoRespPacket = resp.newBuilder()
+                        .setType("resp")
+                        .setResp("wp") // wp: wrong packet
+                        .setIndex(packetIndex) // right packet index
+                        .build();
+                RetryCount++;
+            } else {
+                ProtoRespPacket = resp.newBuilder()
+                        .setType("resp")
+                        .setResp("mrr") // mrr: max retry reached
+                        .build();
+            }
+        }
+
+        return ProtoRespPacket;
+    }
+
+    /**
      * Metodo che crea il pacchetto di risposta al pacchetto di informazioni
+     *
      * @return il pacchetto Json di risposta
      */
     public JsonObject getInfoRespPacket() {
@@ -141,10 +194,36 @@ public class FileHandlerServer {
     }
 
     /**
-     * Metodo che effettua l'hashing MD5 del file ricevuto e lo confronta con il digest del pacchetto informazioni
+     * Metodo che crea il pacchetto di risposta protobuf al pacchetto di
+     * informazioni
+     *
+     * @return il pacchetto protobuf di risposta protobuf
+     */
+    public resp getProtoInfoRespPacket() {
+        resp ProtoInfoRespPacket;
+        if (this.startIndex != -1) {
+            ProtoInfoRespPacket = resp.newBuilder()
+                    .setType("resp")
+                    .setResp("ok")
+                    .setIndex(this.startIndex)
+                    .build();
+        } else {
+            ProtoInfoRespPacket = resp.newBuilder()
+                    .setType("resp")
+                    .setResp("fae") // fae = file already exists
+                    .build();
+        }
+
+        return ProtoInfoRespPacket;
+    }
+
+    /**
+     * Metodo che effettua l'hashing MD5 del file ricevuto e lo confronta con il
+     * digest del pacchetto informazioni
+     *
      * @return true se i digest sono uguali, altrimenti false
      * @throws IOException
-     * @throws NoSuchAlgorithmException 
+     * @throws NoSuchAlgorithmException
      */
     public final boolean checksum() throws IOException, NoSuchAlgorithmException {
         byte[] byteFile = Files.readAllBytes(FileToRecv.toPath());

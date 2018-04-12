@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package packet;
+
+option java_package = "packet";
+option java_outer_classname = "protoPacket";
+
+message dataPacket {
+	string type = 1;
+	int32 number = 2;
+	bytes text = 3;
+}
+
+message info {
+	string type = 1;
+	string name = 2;
+	int64 length = 3;
+	string checksum = 4;
+}
+
+message resp {
+	string type = 1;
+	string resp = 2;
+	sint32 index = 3;
+}
