@@ -12,9 +12,6 @@ import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Base64;
-import javax.json.Json;
-import javax.json.JsonObject;
 import packet.protoPacket.resp;
 import packet.protoPacket.dataPacket;
 
@@ -87,51 +84,6 @@ public class FileHandlerServer {
      * correttor, altrimenti richiede il pacchetto con il numero corretto, per
      * un massimo di tre volte
      *
-     * @param JsonPacket Il pacchetto da aggiungere al file
-     * @param packetIndex l'indice corretto
-     * @return il pacchetto Json di risposta
-     * @throws IOException
-     */
-    public JsonObject addPacket(JsonObject JsonPacket, int packetIndex) throws IOException {
-        JsonObject JsonRespPacket;
-
-        if (JsonPacket.getInt("number") == packetIndex) {
-            String base64json = JsonPacket.getString("text");
-            // decodifico il pacchetto da Base64 a binario
-            byte[] packet = Base64.getDecoder().decode(base64json);
-            // accodo il pacchetto al file
-            Files.write(FileToRecv.toPath(), packet, StandardOpenOption.APPEND);
-
-            JsonRespPacket = Json.createObjectBuilder()
-                    .add("type", "resp")
-                    .add("resp", "ok")
-                    .build();
-
-            RetryCount = 0;
-        } else {
-            if (RetryCount < 3) {
-                JsonRespPacket = Json.createObjectBuilder()
-                        .add("type", "resp")
-                        .add("resp", "wp") // wp: wrong packet
-                        .add("index", packetIndex) // right packet index
-                        .build();
-                RetryCount++;
-            } else {
-                JsonRespPacket = Json.createObjectBuilder()
-                        .add("type", "resp")
-                        .add("resp", "mrr") // mrr: max retry reached
-                        .build();
-            }
-        }
-
-        return JsonRespPacket;
-    }
-
-    /**
-     * Metodo che aggiunge il pacchetto ricevuto al file in caso il numero sia
-     * correttor, altrimenti richiede il pacchetto con il numero corretto, per
-     * un massimo di tre volte
-     *
      * @param protoPacket Il pacchetto da aggiungere al file
      * @param packetIndex l'indice corretto
      * @return il pacchetto protobuf di risposta
@@ -168,29 +120,6 @@ public class FileHandlerServer {
         }
 
         return ProtoRespPacket;
-    }
-
-    /**
-     * Metodo che crea il pacchetto di risposta al pacchetto di informazioni
-     *
-     * @return il pacchetto Json di risposta
-     */
-    public JsonObject getInfoRespPacket() {
-        JsonObject JsonInfoRespPacket;
-        if (this.startIndex != -1) {
-            JsonInfoRespPacket = Json.createObjectBuilder()
-                    .add("type", "resp")
-                    .add("resp", "ok")
-                    .add("index", this.startIndex)
-                    .build();
-        } else {
-            JsonInfoRespPacket = Json.createObjectBuilder()
-                    .add("type", "resp")
-                    .add("resp", "fae") // fae = file already exists
-                    .build();
-        }
-
-        return JsonInfoRespPacket;
     }
 
     /**

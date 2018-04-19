@@ -13,17 +13,10 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.Files;
 import java.security.NoSuchAlgorithmException;
-import javax.json.Json;
-import javax.json.JsonException;
-import javax.json.JsonObject;
-import javax.json.JsonReader;
-import javax.json.JsonWriter;
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
@@ -152,16 +145,8 @@ public class ETPServer extends JFrame {
 
                         errorCounter = 0;
 
-                        // Inizializzazione delle stream dalla socket
-                        //BufferedWriter out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
-                        //BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                        // Creazione delle stream di JSON per leggere e scrivere nella stream della socket
-                        //JsonWriter writer = Json.createWriter(out);
-                        //JsonReader reader = Json.createReader(in);
                         // lettura del pacchetto informazioni
                         info ProtoInfoPacket = info.parseDelimitedFrom(socket.getInputStream());
-                        //JsonObject JsonInfoPacket = reader.readObject();
-                        //System.out.println(JsonInfoPacket.toString());
                         monitor.append("Il client vuole inviare il file:\n Nome: " + ProtoInfoPacket.getName() + "\n Dimensioni: " + ProtoInfoPacket.getLength() + "\n Digest: " + ProtoInfoPacket.getChecksum() + "\n");
 
                         File FileToRecv;
@@ -174,29 +159,20 @@ public class ETPServer extends JFrame {
                             FileToRecv = new File("Download/" + ProtoInfoPacket.getName());
                         }
                         fhs = new FileHandlerServer(FileToRecv, ProtoInfoPacket.getChecksum(), (int) ProtoInfoPacket.getLength());
-                        fhs.getProtoInfoRespPacket().writeDelimitedTo(socket.getOutputStream());
-                        //JsonObject JsonInfoRespPacket = fhs.getInfoRespPacket();
                         // invio del pacchetto di risposta al pacchetto informazioni
-                        //writer.writeObject(JsonInfoRespPacket);
-                        //out.flush();
+                        fhs.getProtoInfoRespPacket().writeDelimitedTo(socket.getOutputStream());
 
                         if (fhs.startIndex != -1) {
                             //System.out.println(fhs.nPackets);
                             monitor.append("Pacchetti: " + fhs.nPackets + "\nInizio download...\n");
                             long time = System.nanoTime();
                             for (int i = fhs.startIndex; i < fhs.nPackets; i++) {
-                                //reader = Json.createReader(in);
                                 // leggo il pacchetto dati
                                 dataPacket ProtoPacket = dataPacket.parseDelimitedFrom(socket.getInputStream());
-                                //JsonObject JsonPacket = reader.readObject();
 
-                                //writer = Json.createWriter(out);
-                                //JsonObject JsonRespPacket = fhs.addPacket(JsonPacket, i);
                                 resp ProtoRespPacket = fhs.addProtoPacket(ProtoPacket, i);
                                 // invio il pacchetto di risposta
                                 ProtoRespPacket.writeDelimitedTo(socket.getOutputStream());
-                                //writer.writeObject(JsonRespPacket);
-                                //out.flush();
                                 if (!ProtoRespPacket.getResp().equals("mrr")) {
                                     //System.out.println("Pacchetto " + i + " ricevuto correttamente");
                                     float percent = 100f / fhs.nPackets * (i + 1);
@@ -230,9 +206,6 @@ public class ETPServer extends JFrame {
                             monitor.append("File già presente nella directory\n");
                         }
 
-                        // chiusura delle stream di Json
-                        //writer.close();
-                        //reader.close();
                         monitor.append("Chiusura del server...\n");
                         // chiusura delle socket
                         socket.close();
